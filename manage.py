@@ -8,8 +8,9 @@ Usage is
 """
 
 import click
+from gns3_bgp_frr.gns3 import test_function
 
-
+# define global group to make subcommands available
 @click.group()
 def cli():
     pass
@@ -17,8 +18,9 @@ def cli():
 
 @cli.command()
 def test():
-    print("should test")
+    test_function()
 
 
+# make subcommands available
 if __name__ == "__main__":
     cli()

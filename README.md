@@ -1,5 +1,6 @@
 # gns3-bgp-frr
-A lightweight GNS3 BGP lab using FRR docker containers and Python automation
+
+A lightweight GNS3 BGP lab using FRR docker containers and Python automation. WIP.
 
 ## Topology
 
@@ -16,13 +17,13 @@ A lightweight GNS3 BGP lab using FRR docker containers and Python automation
   * image: `alpine`
   * adapters: `1`
 * Set up the topology like the above. TODO: automate this (how big is a portable project?)
-* Copy `example.env` to `.env` and fill out
+* Copy `settings.example.py` to `settings.py` and fill out
 * Create a virtual environment and activate it
   * `python -m venv env`
   * (Windows) `env/scripts/activate.ps1`
 * Install dependencies
   * `pip install -r requirements.txt`
-* TODO: run the configuration script
+* run `python manage.py test`
 
 ## Controlling
 
