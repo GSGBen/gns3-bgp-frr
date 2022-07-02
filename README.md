@@ -20,4 +20,12 @@ A lightweight GNS3 BGP lab using FRR docker containers and Python automation
 * Create a virtual environment and activate it
   * `python -m venv env`
   * (Windows) `env/scripts/activate.ps1`
+* Install dependencies
+  * `pip install -r requirements.txt`
 * TODO: run the configuration script
+
+## Controlling
+
+Control is via subcommands and options sent to `manage.py`.
+
+Usage: `python manage.py <global options> <command> <command options>`
