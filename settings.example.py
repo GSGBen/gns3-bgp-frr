@@ -2,3 +2,4 @@
 GNS3_SERVER_URL = "http://example:3080"
 GNS3_SERVER_USERNAME = "exampleuser"
 GNS3_SERVER_PASSWORD = "examplepassword"
+PROJECT_NAME = "frr-bgp"

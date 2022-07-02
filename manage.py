@@ -8,7 +8,7 @@ Usage is
 """
 
 import click
-from gns3_bgp_frr.gns3 import test_function
+from gns3_bgp_frr import gns3
 
 # define global group to make subcommands available
 @click.group()
@@ -17,8 +17,11 @@ def cli():
 
 
 @cli.command()
-def test():
-    test_function()
+def start():
+    """
+    Starts all nodes.
+    """
+    gns3.start()
 
 
 # make subcommands available
