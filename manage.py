@@ -17,11 +17,36 @@ def cli():
 
 
 @cli.command()
-def start():
+def start_all():
     """
     Starts all nodes.
     """
-    gns3.start()
+    gns3.start_all()
+
+
+@cli.command()
+def stop_all():
+    """
+    Stops all nodes.
+    """
+    gns3.stop_all()
+
+
+@cli.command()
+def reset():
+    """
+    Undoes all automated changes.
+    """
+    gns3.reset_all()
+
+
+@cli.command()
+def set_up():
+    """
+    Enable the required OSPF and BGP daemons on each node.
+    Run twice or restart GNS3 after running once if one of them doesn't start.
+    """
+    gns3.set_daemon_state(True)
 
 
 # make subcommands available
