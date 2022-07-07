@@ -35,10 +35,11 @@ def reset_all():
     Resets the entire project to default. If you configure something in the project, add
     a reset_<thing>() function to undo it and call it from here.
     """
-    set_daemon_state(False)
+    set_daemon_state_all(False)
+    clear_config_all()
 
 
-def set_daemon_state(enabled: bool = True):
+def set_daemon_state_all(enabled: bool = True):
     """
     Enable the required daemons on each node.
     """
@@ -82,3 +83,19 @@ def run_shell_command(frr_node: gns3fy.Node, command: str):
 
         telnet.write(command.encode() + b"\n")
         telnet.read_until(b"#", timeout=TELNET_TIMEOUT)
+
+
+def clear_config_all():
+    """
+    Clears the frr config on all nodes.
+    """
+    # they need to be started for us to run commands on them
+    project.start_nodes()
+
+    for node in project.nodes:
+        if is_router(node):
+            run_shell_command(node, "rm /etc/frr/*.conf*")
+
+    # they need to be restarted for it to apply
+    project.stop_nodes()
+    project.start_nodes()

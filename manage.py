@@ -46,7 +46,7 @@ def set_up():
     Enable the required OSPF and BGP daemons on each node.
     Run twice or restart GNS3 after running once if one of them doesn't start.
     """
-    gns3.set_daemon_state(True)
+    gns3.set_daemon_state_all(True)
 
 
 # make subcommands available
