@@ -1,3 +1,7 @@
 {
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "rewrap.autoWrap.enabled": true,
+    "rewrap.reformat": true,
+    "rewrap.wrappingColumn": 88,
+    "python.formatting.provider": "black"
 }

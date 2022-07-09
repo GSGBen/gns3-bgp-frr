@@ -1,3 +1,4 @@
+from typing import Dict, List
 import gns3fy
 import os
 from settings import *
@@ -6,7 +7,8 @@ from telnetlib import Telnet
 # connection and command write timeout
 TELNET_TIMEOUT = 5
 
-# set up the connection to the project once for all functionality below
+# set up the connection to the project once for all functionality below (and anyone that
+# imports us)
 gns3_server = gns3fy.Gns3Connector(
     GNS3_SERVER_URL, GNS3_SERVER_USERNAME, GNS3_SERVER_PASSWORD
 )
@@ -48,6 +50,7 @@ def set_daemon_state_all(enabled: bool = True):
 
     for node in project.nodes:
         if is_router(node):
+            # change =no to =yes for the bgpd and ospfd lines
             run_shell_command(node, "sed -i 's/bgpd=no/bgpd=yes/g' /etc/frr/daemons")
             run_shell_command(node, "sed -i 's/ospfd=no/ospfd=yes/g' /etc/frr/daemons")
 
@@ -94,8 +97,31 @@ def clear_config_all():
 
     for node in project.nodes:
         if is_router(node):
+            # delete all frr config files and conf.sav files
             run_shell_command(node, "rm /etc/frr/*.conf*")
 
     # they need to be restarted for it to apply
     project.stop_nodes()
     project.start_nodes()
+
+
+def get_node_links(node: gns3fy.Node) -> Dict[int, gns3fy.Link]:
+    """
+    `node.links` doesn't seem to be populated so we need to search through
+    `project.links`.
+
+    Returns a dict mapping the node's interface adapter numbers to the link objects
+    they're attached to. E.g.
+    `{0: <gns3fy.Link object>, 7: <other gns3fy.Link object>}`
+    """
+    found_links = {}
+
+    # find links referencing the given node
+    for link in project.links:
+        for node_entry in link.nodes:
+            if node_entry.node_id == node.node_id:
+                # the link nodes call them port_number, the node ports call them
+                # adapter_number
+                found_links[node_entry["adapter_number"]] = link
+
+    return found_links
