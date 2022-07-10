@@ -34,7 +34,7 @@ def get_interface_ips() -> Dict[str, Dict[str, str]]:
             Inner dicts mapping node port names (e.g. "eth0") to interface IP/Masks in
             CIDR notation (e.g. "10.0.0.1/24")
     """
-    output_dict = {}
+    output_dict: Dict[str, Dict[str, str]] = {}
 
     subnets = list(get_p2p_subnets())
 
@@ -53,13 +53,23 @@ def get_interface_ips() -> Dict[str, Dict[str, str]]:
                 # ensure their output entry exists
                 if node.name not in output_dict.keys():
                     output_dict[node.name] = {}
-                # assign the next available IP in the subnet
-                ip = next(subnet_ips)
                 # the link stores the port number of the host. Convert it to the name of
                 # the port
                 port_number = node_entry["adapter_number"]
                 port_name = node.ports[port_number]["name"]
+
+                # handle external addressing as a special case
+                if node.name in ["asn1border1", "asn1border2"] and port_name == "eth7":
+                    if node.name == "asn1border1":
+                        ip_cidr = ASN1BORDER1_EXTERNAL_IP
+                    else:
+                        ip_cidr = ASN1BORDER2_EXTERNAL_IP
+                else:
+                    # otherwise assign the next available IP in the subnet
+                    ip = next(subnet_ips)
+                    ip_cidr = f"{ip}/{link_subnet.prefixlen}"
+
                 # record it
-                output_dict[node.name][port_name] = f"{ip}/{link_subnet.prefixlen}"
+                output_dict[node.name][port_name] = ip_cidr
 
     return output_dict
