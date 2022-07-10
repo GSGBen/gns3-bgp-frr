@@ -84,25 +84,27 @@ def run_shell_commands(frr_node: gns3fy.Node, commands: List[str]):
     """
     Runs multiple commands in the outer sh shell of the frr image.
 
-    Increase `delay_seconds` if there are weird input errors.
+    I was getting weird input errors. Happened intermittently before `conf t`. It shows
+    up as `\\x07;5R` (so `\\x07;5Rconf t) if I read it which doesn't show up in google
+    and doesn't look exactly like an ANSI code.
 
-    I'm was getting weird input errors. Happened intermittently before `conf t`. It
-    shows up as `\\x07;5R` (so `\\x07;5Rconf t) if I read it which doesn't show up in google and
-    doesn't look exactly like an ANSI code.
+    x07 is the ASCII bell. This is only happening on the node I have a GNS3 putty aux
+    session open to. probably that putty session interfering. As a hacky workaround I
+    could clear the line (ctrl-c) or backspace a bunch of times (\\b\\b\\b).
 
-    x07 is the ASCII bell. Not sure what's triggering it though. Ah, I  think this is
-    only happening on the node I have a GNS3 putty aux session open to.
+    Pretty much confirmed: it follows the one I have open and I can't reproduce it when
+    it's closed.
 
     What didn't work:
       - delay of 0.1
       - sending `\\r\\n` instead of `\\n`
       - `command.strip()` and `escape_ansi_bytes(command_line)` before sending
       - waiting until "# " instead of "#". There was an extra space in the prompt I was
-        missing. This makes me think there was still data in the buffer to be read, that
-        I was somehow writing back. Maybe .read_eager() or .read_lazy() before I write
-        would help.
+        missing.
+    - .read_eager()
 
     What did work:
+      - clearing the line before writing with ctrl-c
 
     """
     telnet_port = frr_node.properties["aux"]
@@ -121,17 +123,18 @@ def run_shell_commands(frr_node: gns3fy.Node, commands: List[str]):
 
         for command in commands:
             command_line = command.strip().encode() + b"\n"
-            # ensure everything is clear to avoid the junk (see docstring)
-            result_eager = telnet.read_eager()
+            # send ctrl-c to clear the line to avoid the junk if a putty session is open
+            # to the same port (see docstring)
+            telnet.write(b"\x03")
+            result = telnet.read_until(prompt, timeout=TELNET_TIMEOUT)
+
             telnet.write(command_line)
             result = telnet.read_until(prompt, timeout=TELNET_TIMEOUT)
 
-            # debug
-            print(f"{frr_node.name}: {result_eager}, <command>, {result}")
-            if str(result).find("Unknown command") != -1:
-                rich.print("[bold red]error above[/]")
-            if result_eager:
-                rich.print("[bold yellow]result_eager above has content[/]")
+            # # debug
+            # print(f"{frr_node.name}: {result}")
+            # if str(result).find("Unknown command") != -1:
+            #    rich.print("[bold red]error above[/]")
 
 
 def escape_ansi_bytes(input: bytes):
