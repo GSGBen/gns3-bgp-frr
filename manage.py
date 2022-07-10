@@ -59,6 +59,16 @@ def generate_configs():
     configs.generate_configs()
 
 
+@cli.command()
+def apply_configs():
+    """
+    Apply the generated configs to the devices.
+    Configs must have been generated first.
+    Automatically starts the nodes.
+    """
+    configs.apply_configs()
+
+
 # make subcommands available
 if __name__ == "__main__":
     cli()

@@ -1,14 +1,14 @@
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pathlib import Path
-from gns3_bgp_frr import addressing
+from gns3_bgp_frr import addressing, gns3
 
 # load jinja2 templates from the templates folder in the base
 parent_path = Path(__file__).resolve().parent
 root_path = parent_path / ".."
-templates_path = root_path / "templates"
+templates_folder_path = root_path / "templates"
 
 env = Environment(
-    loader=FileSystemLoader(templates_path), autoescape=select_autoescape()
+    loader=FileSystemLoader(templates_folder_path), autoescape=select_autoescape()
 )
 
 # write to this folder
@@ -35,3 +35,28 @@ def generate_configs():
         config = base_config
         with open(output_path, "w") as output_file:
             output_file.write(config)
+
+
+def apply_configs():
+    """
+    Apply the generated configs to the devices.
+    Configs must have been generated first.
+    Automatically starts the nodes.
+    """
+
+    gns3.start_all()
+
+    for config_file_path in output_folder_path.iterdir():
+        node_name = config_file_path.name.split(".")[0]
+        node = gns3.project.get_node(name=node_name)
+
+        with open(config_file_path) as config_file:
+            config_lines = config_file.read().splitlines()
+            # enter config mode
+            config_lines.insert(0, "vtysh")
+            config_lines.insert(1, "conf t")
+            # save
+            config_lines.append("end")
+            config_lines.append("wr mem")
+
+            gns3.run_shell_commands(node, config_lines)
