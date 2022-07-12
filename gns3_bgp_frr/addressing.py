@@ -34,11 +34,17 @@ def get_interface_ips() -> Dict[str, Dict[str, str]]:
             Inner dicts mapping node port names (e.g. "eth0") to interface IP/Masks in
             CIDR notation (e.g. "10.0.0.1/24")
     """
+
+    # there's weirdness if the nodes aren't started
+    gns3.start_all()
+
     output_dict: Dict[str, Dict[str, str]] = {}
 
     subnets = list(get_p2p_subnets())
 
     for index, link in enumerate(gns3.project.links):
+        if link.nodes is None:
+            continue
         # assign a /30 per link
         if index >= len(subnets):
             raise IndexError("too many links, not enough /30s in the given supernet")
@@ -49,27 +55,33 @@ def get_interface_ips() -> Dict[str, Dict[str, str]]:
         # assign each router in this link an IP in the subnet
         for node_entry in link.nodes:
             node = gns3.project.get_node(node_id=node_entry["node_id"])
-            if gns3.is_router(node):
-                # ensure their output entry exists
-                if node.name not in output_dict.keys():
-                    output_dict[node.name] = {}
-                # the link stores the port number of the host. Convert it to the name of
-                # the port
-                port_number = node_entry["adapter_number"]
-                port_name = node.ports[port_number]["name"]
+            if (
+                node is None
+                or node.name is None
+                or node.ports is None
+                or not gns3.is_router(node)
+            ):
+                continue
+            # ensure their output entry exists
+            if node.name not in output_dict.keys():
+                output_dict[node.name] = {}
+            # the link stores the port number of the host. Convert it to the name of
+            # the port
+            port_number = node_entry["adapter_number"]
+            port_name = node.ports[port_number]["name"]
 
-                # handle external addressing as a special case
-                if node.name in ["asn1border1", "asn1border2"] and port_name == "eth7":
-                    if node.name == "asn1border1":
-                        ip_cidr = ASN1BORDER1_EXTERNAL_IP
-                    else:
-                        ip_cidr = ASN1BORDER2_EXTERNAL_IP
+            # handle external addressing as a special case
+            if node.name in ["asn1border1", "asn1border2"] and port_name == "eth7":
+                if node.name == "asn1border1":
+                    ip_cidr = ASN1BORDER1_EXTERNAL_IP
                 else:
-                    # otherwise assign the next available IP in the subnet
-                    ip = next(subnet_ips)
-                    ip_cidr = f"{ip}/{link_subnet.prefixlen}"
+                    ip_cidr = ASN1BORDER2_EXTERNAL_IP
+            else:
+                # otherwise assign the next available IP in the subnet
+                ip = next(subnet_ips)
+                ip_cidr = f"{ip}/{link_subnet.prefixlen}"
 
-                # record it
-                output_dict[node.name][port_name] = ip_cidr
+            # record it
+            output_dict[node.name][port_name] = ip_cidr
 
     return output_dict

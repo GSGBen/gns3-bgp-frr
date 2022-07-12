@@ -33,14 +33,6 @@ def stop_all():
 
 
 @cli.command()
-def reset():
-    """
-    Undoes all automated changes.
-    """
-    gns3.reset_all()
-
-
-@cli.command()
 def set_up():
     """
     Enable the required OSPF and BGP daemons on each node.
@@ -51,10 +43,23 @@ def set_up():
 
 
 @cli.command()
+def reset():
+
+    """
+    Resets the entire project to default. If you configure something in the project, add
+    a reset_<thing>() function to undo it and call it from here.
+    """
+    gns3.set_daemon_state_all(False)
+    configs.clear_frr_configs()
+    configs.clear_alpine_config()
+
+
+@cli.command()
 def generate_configs():
     """
     Automatically generate addresses then create FRR configs for each router, in the
     `<project root>/generated` folder.
+    Automatically starts the nodes (required to avoid errors when reading links).
     """
     configs.generate_configs()
 
@@ -66,7 +71,8 @@ def apply_configs():
     Configs must have been generated first.
     Automatically starts the nodes.
     """
-    configs.apply_configs()
+    configs.apply_frr_configs()
+    configs.configure_alpine()
 
 
 # make subcommands available
