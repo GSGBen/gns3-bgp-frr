@@ -10,6 +10,14 @@ extend it with your own commands.
 
 ![topology](images/topology.png)
 
+## Commandline
+
+Control is via subcommands and options sent to `manage.py`.
+
+![commandline](images/commandline.png)
+
+Usage: `python manage.py <global options> <command> <command options>`
+
 ## Setup
 
 * [Install GNS3 and the GNS3 VM](https://docs.gns3.com/docs/getting-started/installation/windows)
@@ -30,11 +38,3 @@ extend it with your own commands.
 * Install dependencies
   * `pip install -r requirements.txt`
 * run `python manage.py start-all`
-
-## Controlling
-
-Control is via subcommands and options sent to `manage.py`.
-
-![commandline](images/commandline.png)
-
-Usage: `python manage.py <global options> <command> <command options>`
