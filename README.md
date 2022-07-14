@@ -30,7 +30,7 @@ Usage: `python manage.py <global options> <command> <command options>`
   * image: `alpine`
   * adapters: `1`
 * Set up the topology like the above. TODO: automate this (how big is a portable project?)
-* Clone/download this project and open a powershell window
+* Clone/download this project and open a PowerShell window in the folder
 * Copy `settings.example.py` to `settings.py` and fill out
 * Create a virtual environment and activate it
   * `python -m venv env`
