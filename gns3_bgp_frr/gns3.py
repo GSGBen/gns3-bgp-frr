@@ -3,7 +3,7 @@ from time import sleep
 from typing import Dict, List, Literal
 import gns3fy
 import os
-from gns3_bgp_frr import configs
+from gns3_bgp_frr import configs, logging
 from settings import *
 from telnetlib import Telnet
 import rich
@@ -23,18 +23,24 @@ if project.status != "opened":
 # print("ran gns3.py startup code")
 
 
-def start_all():
+def start_all(log=False):
     """
     Starts all nodes.
     """
+    if log:
+        logging.log("Starting all nodes ", "info")
+
     project.start_nodes()
 
 
-def start_node(node: gns3fy.Node):
+def start_node(node: gns3fy.Node, log=False):
     """
     Starts a node and blocks until it's available.
     This might not be needed, <node>.start() might already do it.
     """
+    if log:
+        logging.log(f"Starting {node.name} ", "info")
+
     node.start()
     max_wait_seconds = 5.0
     waited_seconds = 0.0
@@ -44,39 +50,57 @@ def start_node(node: gns3fy.Node):
         sleep(0.5)
         waited_seconds += 0.5
 
+    if log:
+        logging.log(f"Done", "done")
 
-def stop_all():
+
+def stop_all(log=False):
     """
-    Starts all nodes.
+    Stops all nodes.
     """
+    if log:
+        logging.log("Stopping all nodes ", "info")
+
     project.stop_nodes()
 
 
-def reset_all():
+def reset_all(log=False):
     """
     Resets the entire project to default. If you configure something in the project, add
     a reset_<thing>() function to undo it and call it from here.
     """
-    set_daemon_state_all(False)
-    configs.clear_frr_configs()
+    set_daemon_state_all(False, log=log)
+    configs.clear_frr_configs(log=log)
 
 
-def set_daemon_state_all(enabled: bool = True):
+def set_daemon_state_all(enabled: bool = True, log=False):
     """
     Enable the required daemons on each node.
     """
+
     # they need to be started for us to run commands on them
-    project.start_nodes()
+    start_all(log=log)
+
+    if log:
+        verb = "enabling" if enabled else "disabling"
+        logging.log(f"{verb} bgp and ospf daemons", "info")
 
     for node in project.nodes:
         if is_router(node):
+
+            if log:
+                logging.log(f"    [cyan]{node.name}[/]", "info")
+
             # change =no to =yes for the bgpd and ospfd lines
             run_shell_command(node, "sed -i 's/bgpd=no/bgpd=yes/g' /etc/frr/daemons")
             run_shell_command(node, "sed -i 's/ospfd=no/ospfd=yes/g' /etc/frr/daemons")
 
     # they need to be restarted for it to apply
-    project.stop_nodes()
-    project.start_nodes()
+    if log:
+        logging.log("restarting nodes to apply:", "info")
+
+    stop_all(log=log)
+    start_all(log=log)
 
 
 def is_router(node: gns3fy.Node) -> bool:
@@ -169,6 +193,9 @@ def run_shell_commands(
             # print(f"{node.name}: {str(result)}")
             # if str(result).find("Unknown command") != -1:
             #    rich.print("[bold red]error above[/]")
+
+            # try to fix the alpine node not always getting the last command
+            sleep(0.1)
 
 
 def escape_ansi_bytes(input: bytes):

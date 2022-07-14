@@ -21,7 +21,7 @@ def start_all():
     """
     Starts all nodes.
     """
-    gns3.start_all()
+    gns3.start_all(log=True)
 
 
 @cli.command()
@@ -29,7 +29,7 @@ def stop_all():
     """
     Stops all nodes.
     """
-    gns3.stop_all()
+    gns3.stop_all(log=True)
 
 
 @cli.command()
@@ -39,7 +39,7 @@ def set_up():
     Run twice or restart GNS3 after running once if one of them doesn't start (check a
     node with `ps -a`)
     """
-    gns3.set_daemon_state_all(True)
+    gns3.set_daemon_state_all(True, log=True)
 
 
 @cli.command()
@@ -49,9 +49,9 @@ def reset():
     Resets the entire project to default. If you configure something in the project, add
     a reset_<thing>() function to undo it and call it from here.
     """
-    gns3.set_daemon_state_all(False)
-    configs.clear_frr_configs()
-    configs.clear_alpine_config()
+    gns3.set_daemon_state_all(False, log=True)
+    configs.clear_frr_configs(log=True)
+    configs.clear_alpine_config(log=True)
 
 
 @cli.command()
@@ -61,7 +61,7 @@ def generate_configs():
     `<project root>/generated` folder.
     Automatically starts the nodes (required to avoid errors when reading links).
     """
-    configs.generate_configs()
+    configs.generate_configs(log=True)
 
 
 @cli.command()
@@ -71,8 +71,8 @@ def apply_configs():
     Configs must have been generated first.
     Automatically starts the nodes.
     """
-    configs.apply_frr_configs()
-    configs.configure_alpine()
+    configs.apply_frr_configs(log=True)
+    configs.configure_alpine(log=True)
 
 
 # make subcommands available

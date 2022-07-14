@@ -1,22 +1,25 @@
 from typing import Dict
 from netaddr import IPNetwork
 from settings import *
-from gns3_bgp_frr import gns3
+from gns3_bgp_frr import gns3, logging
 import gns3fy
 
 
-def get_p2p_subnets():
+def get_p2p_subnets(log=False):
     """
     Get the /30s available for GNS3 device networking.
     Returns an interable of IPNetwork()s.
     Wrap with list() if you need to get all at once.
     """
+    if log:
+        logging.log(f"carving up {P2P_SUPERNET} into /30s", "info")
+
     # carve up the supernet into /30 subnets
     supernet = IPNetwork(P2P_SUPERNET)
     return supernet.subnet(prefixlen=30)
 
 
-def get_interface_ips() -> Dict[str, Dict[str, str]]:
+def get_interface_ips(log=False) -> Dict[str, Dict[str, str]]:
     """
     Returns a dict of dicts that contains the IP address for each FRR router's connected
     interfaces.
@@ -34,13 +37,18 @@ def get_interface_ips() -> Dict[str, Dict[str, str]]:
             Inner dicts mapping node port names (e.g. "eth0") to interface IP/Masks in
             CIDR notation (e.g. "10.0.0.1/24")
     """
+    if log:
+        logging.log("generating interface IPs", "info")
 
     # there's weirdness if the nodes aren't started
-    gns3.start_all()
+    gns3.start_all(log=log)
 
     output_dict: Dict[str, Dict[str, str]] = {}
 
-    subnets = list(get_p2p_subnets())
+    subnets = list(get_p2p_subnets(log=log))
+
+    if log:
+        logging.log(f"assigning subnets to {len(gns3.project.links)} links", "info")
 
     for index, link in enumerate(gns3.project.links):
         if link.nodes is None:
@@ -73,8 +81,18 @@ def get_interface_ips() -> Dict[str, Dict[str, str]]:
             # handle external addressing as a special case
             if node.name in ["asn1border1", "asn1border2"] and port_name == "eth7":
                 if node.name == "asn1border1":
+                    if log:
+                        logging.log(
+                            "giving [cyan]asn1border1 eth7[/] an external address",
+                            "info",
+                        )
                     ip_cidr = ASN1BORDER1_EXTERNAL_IP
                 else:
+                    if log:
+                        logging.log(
+                            "giving [cyan]asn1border2 eth7[/] an external address",
+                            "info",
+                        )
                     ip_cidr = ASN1BORDER2_EXTERNAL_IP
             else:
                 # otherwise assign the next available IP in the subnet
