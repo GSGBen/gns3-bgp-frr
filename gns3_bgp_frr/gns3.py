@@ -91,9 +91,13 @@ def set_daemon_state_all(enabled: bool = True, log=False):
             if log:
                 logging.log(f"    [cyan]{node.name}[/]", "info")
 
-            # change =no to =yes for the bgpd and ospfd lines
-            run_shell_command(node, "sed -i 's/bgpd=no/bgpd=yes/g' /etc/frr/daemons")
-            run_shell_command(node, "sed -i 's/ospfd=no/ospfd=yes/g' /etc/frr/daemons")
+            running = "yes" if enabled else "no"
+            run_shell_command(
+                node, f"sed -i 's/^bgpd=.*/bgpd={running}/g' /etc/frr/daemons"
+            )
+            run_shell_command(
+                node, f"sed -i 's/^ospfd=.*/ospfd={running}/g' /etc/frr/daemons"
+            )
 
     # they need to be restarted for it to apply
     if log:
