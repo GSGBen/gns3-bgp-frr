@@ -76,3 +76,9 @@ Usage: `python manage.py <global options> <command> <command options>`
 * Run `python manage.py apply-configs`
 * Watch the console - the config should be applied through `vtysh`'s config mode
 
+## Testing
+
+TODO: expand.
+
+* `python manage.py test`
+* `pytest --no-header --tb=line -rA`
