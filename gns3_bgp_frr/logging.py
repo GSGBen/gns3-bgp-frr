@@ -3,14 +3,14 @@ from typing import Literal
 from rich import print
 from itertools import count
 
-log_styles = {"info": "magenta", "done": "green"}
+log_styles = {"info": "magenta", "done": "green", "error": "bold red"}
 
 # we can indent based on function nesting.
 # subtract this number to handle overhead of all functions
 depth_offset = 9
 
 
-def log(message: str, type: Literal["info", "done"], newline=True):
+def log(message: str, type: Literal["info", "done", "error"], newline=True):
     """
     A wrapper around rich.print() that gives us centralised control.
 

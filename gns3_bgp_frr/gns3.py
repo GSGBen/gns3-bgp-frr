@@ -6,20 +6,32 @@ import os
 from gns3_bgp_frr import configs, logging
 from settings import *
 from telnetlib import Telnet
-import rich
 
 # connection and command write timeout
 TELNET_TIMEOUT = 5
 
 # set up the connection to the project once for all functionality below (and anyone that
 # imports us)
-gns3_server = gns3fy.Gns3Connector(
-    GNS3_SERVER_URL, GNS3_SERVER_USERNAME, GNS3_SERVER_PASSWORD
-)
-project = gns3fy.Project(name=PROJECT_NAME, connector=gns3_server)
-project.get()
-if project.status != "opened":
-    project.open()
+try:
+    gns3_server = gns3fy.Gns3Connector(
+        GNS3_SERVER_URL, GNS3_SERVER_USERNAME, GNS3_SERVER_PASSWORD
+    )
+    project = gns3fy.Project(name=PROJECT_NAME, connector=gns3_server)
+    project.get()
+    if project.status != "opened":
+        project.open()
+except:
+    message = f"Couldn't connect to GNS3 project with the following settings.\n \
+                Please make sure they're correct in settings.py.\n \
+                \n \
+                GNS3_SERVER_URL: {GNS3_SERVER_URL}\n \
+                GNS3_SERVER_USERNAME: {GNS3_SERVER_USERNAME}\n \
+                GNS3_SERVER_PASSWORD: <not printed>\n \
+                PROJECT_NAME: {PROJECT_NAME}\n \
+                \n \
+                run [cyan]pytest --no-header --tb=line[/] for a more detailed test.\n"
+    logging.log(message, "error")
+    exit(1)
 # print("ran gns3.py startup code")
 
 

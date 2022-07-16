@@ -84,8 +84,9 @@ def test():
     """
     Run tests.
     """
-    # use the `tests` folder, show names of tests
-    pytest.main(["tests", "-rA"])
+    # use the `tests` folder, show names of successful tests too, show no traceback but
+    # the full error, shorten output
+    pytest.main(["tests", "-rA", "--tb=line", "--no-header"])
 
 
 # make subcommands available
