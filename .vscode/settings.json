@@ -3,5 +3,10 @@
     "rewrap.autoWrap.enabled": false,
     "rewrap.reformat": true,
     "rewrap.wrappingColumn": 88,
-    "python.formatting.provider": "black"
+    "python.formatting.provider": "black",
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
 }
