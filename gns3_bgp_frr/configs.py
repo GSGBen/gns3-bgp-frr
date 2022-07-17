@@ -8,7 +8,6 @@ from netaddr import IPNetwork
 parent_path = Path(__file__).resolve().parent
 root_path = parent_path / ".."
 templates_folder_path = root_path / "templates"
-
 env = Environment(
     loader=FileSystemLoader(templates_folder_path), autoescape=select_autoescape()
 )
@@ -17,6 +16,15 @@ env = Environment(
 output_folder_path = root_path / "generated"
 # ensure it exists
 output_folder_path.mkdir(parents=True, exist_ok=True)
+
+# mark which interfaces of asn1 devices should form ospf adjacencies.
+ospf_interfaces = {
+    "asn1border1": ["eth0", "eth1"],
+    "asn1border2": ["eth0", "eth1"],
+    "asn1border3": ["eth6", "eth7"],
+    "asn1internal1": ["eth0", "eth6", "eth7"],
+    "asn1internal2": ["eth0", "eth6", "eth7"],
+}
 
 
 def generate_configs(log=False):
@@ -31,20 +39,38 @@ def generate_configs(log=False):
 
     # template that applies to all routers
     base_template = env.get_template("base.j2")
+    # template that applies to ospf routers in asn 1
+    ospf_template = env.get_template("ospf.j2")
 
-    for node_name, interface_ips in addressing.get_interface_ips(log=log).items():
+    # IP addresses for the interfaces of all routers
+    interface_ips = addressing.get_interface_ips(log=log)
+
+    for node in gns3.project.nodes:
+        if node.name is None or not gns3.is_router(node):
+            continue
+
+        node_interface_ips = interface_ips[node.name]
+
         # save with a cisco extension to get better highlighting
-        file_name = f"{node_name}.ios"
+        file_name = f"{node.name}.ios"
 
         if log:
             logging.log(f"generating [cyan]{file_name}[/]", "info")
 
-        output_path = output_folder_path / file_name
         # generate separate config sections
-        base_config = base_template.render({"interface_ips": interface_ips})
+        base_config = base_template.render({"interface_ips": node_interface_ips})
+        # ospf only for asn 1
+        if node.name.startswith("asn1"):
+            node_ospf_interfaces = ospf_interfaces[node.name]
+            ospf_config = ospf_template.render(
+                {"ospf_interfaces": node_ospf_interfaces}
+            )
+        else:
+            ospf_config = ""
 
+        output_path = output_folder_path / file_name
         # write a single combined config file
-        config = base_config
+        config = base_config + "\n" + ospf_config
         with open(output_path, "w") as output_file:
             output_file.write(config)
 

@@ -1,0 +1,10 @@
+! ospf config
+{% for name in ospf_interfaces -%}
+interface {{ name }}
+ no ip ospf passive
+{% endfor -%}
+!
+router ospf
+ passive-interface default
+ network 0.0.0.0/0 area 0
+!
