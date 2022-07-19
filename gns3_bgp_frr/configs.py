@@ -1,8 +1,11 @@
 from time import sleep
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from typing import Dict
+from jinja2 import Environment, FileSystemLoader, select_autoescape, Template
 from pathlib import Path
 from gns3_bgp_frr import addressing, gns3, logging
 from netaddr import IPNetwork
+import gns3fy
+import settings
 
 # load jinja2 templates from the templates folder in the base
 parent_path = Path(__file__).resolve().parent
@@ -41,9 +44,13 @@ def generate_configs(log=False):
     base_template = env.get_template("base.j2")
     # template that applies to ospf routers in asn 1
     ospf_template = env.get_template("ospf.j2")
+    # template that applies to all border routers
+    bgp_template = env.get_template("bgp.j2")
 
     # IP addresses for the interfaces of all routers
     interface_ips = addressing.get_interface_ips(log=log)
+    # asn1 p2p links summarised
+    asn1_supernet = addressing.get_asn1_supernet()
 
     for node in gns3.project.nodes:
         if node.name is None or not gns3.is_router(node):
@@ -59,20 +66,82 @@ def generate_configs(log=False):
 
         # generate separate config sections
         base_config = base_template.render({"interface_ips": node_interface_ips})
-        # ospf only for asn 1
-        if node.name.startswith("asn1"):
-            node_ospf_interfaces = ospf_interfaces[node.name]
-            ospf_config = ospf_template.render(
-                {"ospf_interfaces": node_ospf_interfaces}
-            )
-        else:
-            ospf_config = ""
+        ospf_config = generate_ospf_config(node.name, ospf_template, asn1_supernet)
+        bgp_config = generate_bgp_config(node, bgp_template, interface_ips)
 
         output_path = output_folder_path / file_name
         # write a single combined config file
-        config = base_config + "\n" + ospf_config
+        config = base_config + "\n" + ospf_config + "\n" + bgp_config
         with open(output_path, "w") as output_file:
             output_file.write(config)
+
+
+def generate_ospf_config(
+    node_name: str, ospf_template: Template, asn1_supernet: IPNetwork
+) -> str:
+    """
+    Generate and return the OSPF part of the config for asn1 devices.
+    @see `generate_configs()`.
+    """
+    if node_name.startswith("asn1"):
+        node_ospf_interfaces = ospf_interfaces[node_name]
+        ospf_config = ospf_template.render(
+            {
+                "ospf_interfaces": node_ospf_interfaces,
+                "asn1_supernet": asn1_supernet,
+            }
+        )
+    else:
+        ospf_config = ""
+
+    return ospf_config
+
+
+def generate_bgp_config(
+    node: gns3fy.Node, bgp_template: Template, interface_ips: Dict[str, Dict[str, str]]
+) -> str:
+    """
+    Generate and return the BGP part of the config for border devices.
+    @see `generate_configs()`.
+    """
+    # only generate for border devices
+    if node.name and node.name.find("border") != -1:
+
+        asn = gns3.get_asn(node.name)
+        neighbors = gns3.get_neighboring_border_routers_info(node, interface_ips)
+
+        if node.name.startswith("asn1"):
+            # summarise ASN 1 at its edge
+            advertised_networks = [addressing.get_asn1_supernet()]
+            redistribute_connected = False
+        else:
+            advertised_networks = []
+            # non-ASN-1 devices just advertise their connected links instead
+            redistribute_connected = True
+
+        # configure external BGP or a default route for asn1border1 and asn1border2
+        if node.name == "asn1border1" or node.name == "asn1border2":
+            if settings.ENABLE_EXTERNAL_GATEWAY_BGP:
+                neighbors.append(
+                    gns3.NeighboringBorderRouterInfo(
+                        asn=settings.EXTERNAL_GATEWAY_ASN,
+                        name="EXTERNAL",
+                        ip=settings.EXTERNAL_GATEWAY,
+                    )
+                )
+
+        bgp_config = bgp_template.render(
+            {
+                "asn": asn,
+                "neighbors": neighbors,
+                "advertised_networks": advertised_networks,
+                "redistribute_connected": redistribute_connected,
+            }
+        )
+    else:
+        bgp_config = ""
+
+    return bgp_config
 
 
 def apply_frr_configs(log=False):

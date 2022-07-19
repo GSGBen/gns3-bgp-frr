@@ -15,7 +15,7 @@ import pytest
 click.rich_click.USE_RICH_MARKUP = True
 
 # define global group to make subcommands available
-@click.group(cls=AppearanceOrderGroup)
+@click.group(cls=AppearanceOrderGroup, chain=True)
 def cli():
     pass
 

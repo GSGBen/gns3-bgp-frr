@@ -1,0 +1,47 @@
+!========== BGP config
+! define this before using in BGP otherwise it won't send/receive all routes
+! until after a session clear
+ip prefix-list allow-all seq 5 permit any
+!
+! speed up failover
+bfd
+ {%- for neighbor in neighbors %}
+ peer {{ neighbor.ip }}
+   no shutdown
+ {%- endfor %}
+ !
+router bgp {{ asn }}
+ ! FRR 7.4 and up require this now to advertise routes not in our routing table.
+ no bgp network import-check
+ !
+ {%- for neighbor in neighbors %}
+ neighbor {{ neighbor.ip }} remote-as {{ neighbor.asn }}
+ neighbor {{ neighbor.ip }} description {{ neighbor.name }}
+ ! make routing updates instantaneous
+ neighbor {{ neighbor.ip }} advertisement-interval 0
+ ! speed up failover
+ neighbor {{ neighbor.ip }} timers 1 3
+ neighbor {{ neighbor.ip }} bfd
+ {%- endfor %}
+ !
+ address-family ipv4 unicast
+  {%- if advertised_networks %}
+  ! originate specific networks on this device
+  {% endif -%}
+  {%- for network in advertised_networks -%}
+  network {{ network }}
+  {%- endfor %}
+  !
+  {%- if redistribute_connected %}
+  redistribute connected
+  !
+  {% endif %}
+  ! FRR requires this now to send or receive any routes, as part of RFC 8212
+  {%- for neighbor in neighbors %}
+  neighbor {{ neighbor.ip }} prefix-list allow-all in
+  neighbor {{ neighbor.ip }} prefix-list allow-all out
+  {%- endfor %}
+  !
+ exit-address-family
+exit
+!

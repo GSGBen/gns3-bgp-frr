@@ -76,9 +76,36 @@ Usage: `python manage.py <global options> <command> <command options>`
 * Run `python manage.py apply-configs`
 * Watch the console - the config should be applied through `vtysh`'s config mode
 
+## External Connectivity
+
+Note: this uses public AS numbers (1-6) for simplicity. Don't use the BGP method with a device that's peering with other real public ASes.
+
+
+
 ## Testing
 
 TODO: expand.
 
 * `python manage.py test`
 * `pytest --no-header --tb=line -rA`
+
+## Misc notes
+
+* Thought I was losing my mind before I found this: FRR 7.4+ requirements have changed for BGP.
+  * You have to define an out filter to send routes and an in filter to receive them (I knew this one)
+  * But ALSO now set [`no bgp network import-check`](https://docs.frrouting.org/en/latest/bgp.html#clicmd-bgp-network-import-check) to allow advertising routes that aren't in the local routing table (I assumed it was still the original behaviour). What threw me is that `show ip bgp all` on the local router still listed the routes.
+* Debugging FRR:
+
+```sh
+mkdir -p /var/log/frr
+touch /var/log/frr/debug.log
+chmod 666 /var/log/frr/debug.log
+vtysh
+ conf t
+  log file /var/log/frr/debug.log
+  # check and enable what you need to
+  debug ?
+```
+
+* You need to call `node.get_links()` before `node.links`
+* In FRR you have to create the prefix list before specifying it in the BGP config if you want all the routes to work immediately. It'll apply the other way, but you'll be missing some BGP routes and only clearing the session or restarting fixes it.

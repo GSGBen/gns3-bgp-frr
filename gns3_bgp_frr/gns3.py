@@ -1,11 +1,12 @@
+from dataclasses import dataclass
 import re
 from time import sleep
-from typing import Dict, List, Literal
+from typing import Dict, List, Literal, Optional
 import gns3fy
-import os
-from gns3_bgp_frr import configs, logging
+from gns3_bgp_frr import configs, logging, addressing
 from settings import *
 from telnetlib import Telnet
+from netaddr import IPAddress
 
 # connection and command write timeout
 TELNET_TIMEOUT = 5
@@ -42,28 +43,11 @@ def start_all(log=False):
     if log:
         logging.log("Starting all nodes ", "info")
 
-    project.start_nodes()
-
-
-def start_node(node: gns3fy.Node, log=False):
-    """
-    Starts a node and blocks until it's available.
-    This might not be needed, <node>.start() might already do it.
-    """
-    if log:
-        logging.log(f"Starting {node.name} ", "info")
-
-    node.start()
-    max_wait_seconds = 5.0
-    waited_seconds = 0.0
-    while node.status != "started":
-        if waited_seconds >= max_wait_seconds:
-            raise Exception(f"'{node.name}' didn't start within {max_wait_seconds}")
-        sleep(0.5)
-        waited_seconds += 0.5
-
-    if log:
-        logging.log(f"Done", "done")
+    # save time - only run if required. There's a wait from start_nodes() even if
+    # they're already started
+    already_started = all([node.status == "started" for node in project.nodes])
+    if not already_started:
+        project.start_nodes()
 
 
 def stop_all(log=False):
@@ -73,7 +57,11 @@ def stop_all(log=False):
     if log:
         logging.log("Stopping all nodes ", "info")
 
-    project.stop_nodes()
+    # save time - only run if required. There's a wait from stop_nodes() even if
+    # they're already stopped
+    already_stopped = all([node.status == "stopped" for node in project.nodes])
+    if not already_stopped:
+        project.stop_nodes()
 
 
 def reset_all(log=False):
@@ -104,12 +92,11 @@ def set_daemon_state_all(enabled: bool = True, log=False):
                 logging.log(f"    [cyan]{node.name}[/]", "info")
 
             running = "yes" if enabled else "no"
-            run_shell_command(
-                node, f"sed -i 's/^bgpd=.*/bgpd={running}/g' /etc/frr/daemons"
-            )
-            run_shell_command(
-                node, f"sed -i 's/^ospfd=.*/ospfd={running}/g' /etc/frr/daemons"
-            )
+            for daemon in ["bgpd", "ospfd", "bfdd"]:
+                run_shell_command(
+                    node,
+                    f"sed -i 's/^{daemon}=.*/{daemon}={running}/g' /etc/frr/daemons",
+                )
 
     # they need to be restarted for it to apply
     if log:
@@ -225,25 +212,112 @@ def escape_ansi_bytes(input: bytes):
     return ansi_escape_8bit.sub(b"", input)
 
 
-def get_node_links(node: gns3fy.Node) -> Dict[int, gns3fy.Link]:
+def is_asn1_internal_link(link: gns3fy.Link) -> bool:
     """
-    `node.links` doesn't seem to be populated so we need to search through
-    `project.links`.
-
-    Returns a dict mapping the node's interface adapter numbers to the link objects
-    they're attached to. E.g.
-    `{0: <gns3fy.Link object>, 7: <other gns3fy.Link object>}`
+    Returns True if both nodes connected to the link are asn1 nodes.
     """
-    found_links = {}
 
-    # find links referencing the given node
-    for link in project.links:
-        if link.nodes is None:
+    if link and link.nodes and link.nodes[0] and link.nodes[1]:
+        node0 = project.get_node(node_id=link.nodes[0]["node_id"])
+        node1 = project.get_node(node_id=link.nodes[1]["node_id"])
+        if (
+            node0
+            and node1
+            and node0.name
+            and node1.name
+            and node0.name.startswith("asn1")
+            and node1.name.startswith("asn1")
+        ):
+            return True
+
+    # else
+    return False
+
+
+def get_asn(node_name: str) -> Optional[int]:
+    """
+    Returns the AS number of the device via name if it has one, otherwise None.
+    """
+    match = re.match(r"asn(\d+)", node_name)
+    if match and match.group(1):
+        return int(match.group(1))
+
+
+@dataclass
+class NeighboringBorderRouterInfo:
+    """
+    Data representing a border router directly connected to a node, it's AS number and
+    the IP of the interface facing the node.
+
+    Used as a return of get_neighboring_border_routers() for better structure.
+    """
+
+    # asn of the neighboring router.
+    asn: int
+    # name of the neighboring router
+    name: str
+    # IP of the interface facing the target node. No prefix length.
+    ip: str
+
+
+def get_neighboring_border_routers_info(
+    node: gns3fy.Node,
+    interface_ips: Optional[Dict[str, Dict[str, str]]] = None,
+) -> List[NeighboringBorderRouterInfo]:
+    """
+    Returns details of the border routers directly connected to the given node, and
+    their links facing the given node.
+
+    Args:
+        node (gns3fy.Node): The node to get neighboring border routers of.
+
+        interface_ips (Dict[str, Dict[str, str]]): The output of
+        `addressing.get_interface_ips()`. If given we don't have to generate it each
+        call.
+
+    Returns:
+        List[NeighboringBorderRouterInfo]: Info on the neighboring border routers.
+    """
+    # retrieve if not given
+    if interface_ips is None:
+        interface_ips = addressing.get_interface_ips()
+
+    # get neighboring device names and the name of their link facing us
+    neighboring_nodes: Dict[str, str] = {}
+    # populate
+    node.get_links()
+    # connected links
+    for node_link in node.links:
+        if node_link.nodes is None:
             continue
-        for node_entry in link.nodes:
-            if node_entry.node_id == node.node_id:
-                # the link nodes call them port_number, the node ports call them
-                # adapter_number
-                found_links[node_entry["adapter_number"]] = link
+        # nodes on those links including us
+        for link_node_info in node_link.nodes:
+            # not us
+            if link_node_info["node_id"] != node.node_id:
+                neighboring_node = project.get_node(node_id=link_node_info["node_id"])
+                if (
+                    neighboring_node is not None
+                    and neighboring_node.ports is not None
+                    and neighboring_node.name is not None
+                ):
+                    port_number = link_node_info["adapter_number"]
+                    port_name = neighboring_node.ports[port_number]["name"]
+                    neighboring_nodes[neighboring_node.name] = port_name
 
-    return found_links
+    # retrieve the info of border devices
+    return_list: List[NeighboringBorderRouterInfo] = []
+    for neighboring_node_name, interface_name in neighboring_nodes.items():
+        # if they're a border router
+        if neighboring_node_name and neighboring_node_name.find("border") != -1:
+            asn = get_asn(neighboring_node_name)
+
+            ip_cidr = interface_ips[neighboring_node_name][interface_name]
+            ip = ip_cidr.split("/")[0]
+
+            if asn is not None and ip is not None:
+                info = NeighboringBorderRouterInfo(
+                    asn=asn, name=neighboring_node_name, ip=ip
+                )
+                return_list.append(info)
+
+    return return_list

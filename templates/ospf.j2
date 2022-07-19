@@ -1,4 +1,4 @@
-! ospf config
+!========== ospf config
 {% for name in ospf_interfaces -%}
 interface {{ name }}
  no ip ospf passive
@@ -6,5 +6,6 @@ interface {{ name }}
 !
 router ospf
  passive-interface default
- network 0.0.0.0/0 area 0
+ network {{ asn1_supernet }} area 0
+ redistribute bgp
 !
