@@ -1,9 +1,11 @@
+from copy import deepcopy
+import re
 from time import sleep
-from typing import Dict
+from typing import Dict, List
 from jinja2 import Environment, FileSystemLoader, select_autoescape, Template
 from pathlib import Path
 from gns3_bgp_frr import addressing, gns3, logging
-from netaddr import IPNetwork
+from netaddr import IPNetwork, IPAddress
 import gns3fy
 import settings
 
@@ -27,6 +29,13 @@ ospf_interfaces = {
     "asn1border3": ["eth6", "eth7"],
     "asn1internal1": ["eth0", "eth6", "eth7"],
     "asn1internal2": ["eth0", "eth6", "eth7"],
+}
+
+# mark which interfaces of asn1 border devices should form iBGP peers
+asn1_ibgp_interfaces = {
+    "asn1border1": ["eth0", "eth1"],
+    "asn1border2": ["eth0", "eth1"],
+    "asn1border3": ["eth6", "eth7"],
 }
 
 
@@ -89,6 +98,7 @@ def generate_ospf_config(
             {
                 "ospf_interfaces": node_ospf_interfaces,
                 "asn1_supernet": asn1_supernet,
+                "router_id": generate_router_id(node_name),
             }
         )
     else:
@@ -104,23 +114,26 @@ def generate_bgp_config(
     Generate and return the BGP part of the config for border devices.
     @see `generate_configs()`.
     """
-    # only generate for border devices
-    if node.name and node.name.find("border") != -1:
+    # only generate for border and CPE devices
+    if node.name and (node.name.find("border") != -1 or node.name.find("cpe") != -1):
 
         asn = gns3.get_asn(node.name)
+        # directly connected and border only, sonly only eBGP. Not asn1 or asn6 iBGP
         neighbors = gns3.get_neighboring_border_routers_info(node, interface_ips)
 
         if node.name.startswith("asn1"):
             # summarise ASN 1 at its edge
             advertised_networks = [addressing.get_asn1_supernet()]
             redistribute_connected = False
+            # enable iBGP by also peering with all interfaces of other asn1 border nodes
+            neighbors.extend(get_asn1_ibgp_peers_info(node, interface_ips))
         else:
             advertised_networks = []
             # non-ASN-1 devices just advertise their connected links instead
             redistribute_connected = True
 
-        # configure external BGP or a default route for asn1border1 and asn1border2
         if node.name == "asn1border1" or node.name == "asn1border2":
+            # configure external BGP or a default route for asn1border1 and asn1border2
             if settings.ENABLE_EXTERNAL_GATEWAY_BGP:
                 neighbors.append(
                     gns3.NeighboringBorderRouterInfo(
@@ -129,6 +142,12 @@ def generate_bgp_config(
                         ip=settings.EXTERNAL_GATEWAY,
                     )
                 )
+                # and advertise the local network too. Same local network for both
+                external_ip_subnet = IPNetwork(interface_ips[node.name]["eth7"])
+                external_subnet = (
+                    f"{external_ip_subnet.network}/{external_ip_subnet.prefixlen}"
+                )
+                advertised_networks.append(IPNetwork(external_subnet))
 
         bgp_config = bgp_template.render(
             {
@@ -136,12 +155,72 @@ def generate_bgp_config(
                 "neighbors": neighbors,
                 "advertised_networks": advertised_networks,
                 "redistribute_connected": redistribute_connected,
+                "router_id": generate_router_id(node.name),
             }
         )
     else:
         bgp_config = ""
 
     return bgp_config
+
+
+def get_asn1_ibgp_peers_info(
+    asn1_node: gns3fy.Node, interface_ips: Dict[str, Dict[str, str]]
+) -> List[gns3.NeighboringBorderRouterInfo]:
+    """
+    Given an asn1 node, returns neighbor info on which BGP peers to set up to create
+    iBGP for ASN1.
+    """
+
+    # get the peers and interfaces that aren't us
+    other_asn1_ibgp_interfaces = {
+        name: interfaces
+        for (name, interfaces) in asn1_ibgp_interfaces.items()
+        if name != asn1_node.name
+    }
+
+    ibgp_neighbors = []
+    for name, interfaces in other_asn1_ibgp_interfaces.items():
+        for interface in interfaces:
+            ip = interface_ips[name][interface].split("/")[0]
+            ibgp_neighbors.append(
+                gns3.NeighboringBorderRouterInfo(
+                    asn=1, name=f"{name}-{interface}", ip=ip
+                )
+            )
+
+    return ibgp_neighbors
+
+
+def generate_router_id(node_name: str) -> IPAddress:
+    """
+    Generate a router ID based on the ASN and router number to make things clearer.
+
+    Border routers get 0.0.asn.num - e.g. asn1border1 is 0.0.1.1
+    Internal routers get 0.1.asn.num.
+    CPE routers get 0.2.asn.num.
+    All others get 0.255.asn.num.
+
+    If asn or num are missing or the given name can't be parsed, 255s will be used.
+    """
+    if node_name.find("border") != -1:
+        type_id = 0
+    elif node_name.find("internal") != -1:
+        type_id = 1
+    elif node_name.find("cpe") != -1:
+        type_id = 2
+    else:
+        type_id = 255
+
+    match = re.match(r"asn(\d+)[a-zA-Z]+(\d+)", node_name)
+    if match:
+        asn = match.group(1) if match.group(1) else "255"
+        num = match.group(2) if match.group(2) else "255"
+        router_id = f"0.{type_id}.{asn}.{num}"
+    else:
+        router_id = f"0.{type_id}.255.255"
+
+    return IPAddress(router_id)
 
 
 def apply_frr_configs(log=False):

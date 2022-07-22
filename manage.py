@@ -42,7 +42,7 @@ def set_up():
 def generate_configs():
     """
     Automatically generate addresses then create FRR configs for each router, in the
-    [cyan]\[project root]/generated[/] folder.
+    [cyan]\\[project root]/generated[/] folder.
     Automatically starts the nodes (required to avoid errors when reading links).
     """
     configs.generate_configs(log=True)
@@ -54,9 +54,11 @@ def apply_configs():
     Apply the generated configs to the devices.
     Configs must have been generated first.
     Automatically starts the nodes.
+    Shows IPs in the project.
     """
     configs.apply_frr_configs(log=True)
     configs.configure_alpine(log=True)
+    gns3.show_interface_ips(log=True)
 
 
 @cli.command()
@@ -64,11 +66,12 @@ def reset():
 
     """
     Resets the entire project to default. If you configure something in the project, add
-    a [cyan]reset_\[thing]()[/] function to undo it and call it from here.
+    a [cyan]reset_\\[thing]()[/] function to undo it and call it from here.
     """
     gns3.set_daemon_state_all(False, log=True)
     configs.clear_frr_configs(log=True)
     configs.clear_alpine_config(log=True)
+    gns3.reset_interface_ip_labels(log=True)
 
 
 @cli.command()

@@ -1,11 +1,21 @@
 !========== ospf config
+route-map NOT_IBGP deny 10
+ match tag 1
+route-map NOT_IBGP permit 20
+exit
+!
+router ospf
+ ospf router-id {{ router_id }}
+ passive-interface default
+ ! need to originate locally connected external interfaces too,
+ ! not just the /25 internal ones.
+ network 0.0.0.0/0 area 0
+ ! avoid the wrong border router advertising itself as the next hop for an eBGP route
+ ! - without this they all redistribute all eBGP routes
+ redistribute bgp route-map NOT_IBGP
+!
 {% for name in ospf_interfaces -%}
 interface {{ name }}
  no ip ospf passive
 {% endfor -%}
-!
-router ospf
- passive-interface default
- network {{ asn1_supernet }} area 0
- redistribute bgp
 !

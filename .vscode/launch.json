@@ -8,8 +8,8 @@
             "name": "Python: Attach using Process Id",
             "type": "python",
             "request": "attach",
-            "processId": "${command:pickProcess}",
-            "justMyCode": true
+            "processId": "${command:pickProcess}"
+            //"justMyCode": true
         }
     ]
 }

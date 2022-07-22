@@ -242,6 +242,9 @@ def get_asn(node_name: str) -> Optional[int]:
     if match and match.group(1):
         return int(match.group(1))
 
+    # else
+    return None
+
 
 @dataclass
 class NeighboringBorderRouterInfo:
@@ -265,7 +268,7 @@ def get_neighboring_border_routers_info(
     interface_ips: Optional[Dict[str, Dict[str, str]]] = None,
 ) -> List[NeighboringBorderRouterInfo]:
     """
-    Returns details of the border routers directly connected to the given node, and
+    Returns details of the border and CPE routers directly connected to the given node, and
     their links facing the given node.
 
     Args:
@@ -308,7 +311,10 @@ def get_neighboring_border_routers_info(
     return_list: List[NeighboringBorderRouterInfo] = []
     for neighboring_node_name, interface_name in neighboring_nodes.items():
         # if they're a border router
-        if neighboring_node_name and neighboring_node_name.find("border") != -1:
+        if neighboring_node_name and (
+            neighboring_node_name.find("border") != -1
+            or neighboring_node_name.find("cpe") != -1
+        ):
             asn = get_asn(neighboring_node_name)
 
             ip_cidr = interface_ips[neighboring_node_name][interface_name]
@@ -321,3 +327,69 @@ def get_neighboring_border_routers_info(
                 return_list.append(info)
 
     return return_list
+
+
+def show_interface_ips(log=False):
+    """
+    Updates the label of the ends of each link to show the interface name and the IP
+    assigned.
+    """
+
+    if log:
+        logging.log("updating interface labels", "info")
+
+    interface_ips = addressing.get_interface_ips()
+
+    for link in project.links:
+        if link.nodes is None:
+            continue
+
+        for link_node in link.nodes:
+            node = project.get_node(node_id=link_node["node_id"])
+            if node is None or node.name is None or node.ports is None:
+                continue
+
+            interface_name = node.ports[link_node["adapter_number"]]["name"]
+            if (
+                node.name not in interface_ips
+                or interface_name not in interface_ips[node.name]
+            ):
+                continue
+            interface_ip_cidr = interface_ips[node.name][interface_name]
+            interface_ip = interface_ip_cidr.split("/")[0]
+
+            new_label_text = f"{interface_name}\n{interface_ip}"
+            new_label_style = "'font-family: TypeWriter;font-size: 10.0;font-weight: bold;fill: #444444;fill-opacity: 1.0;'"
+
+            link_node["label"]["text"] = new_label_text
+            link_node["label"]["style"] = new_label_style
+
+        link.update(nodes=link.nodes)
+
+
+def reset_interface_ip_labels(log=False):
+    """
+    Reverts the effects of `show_interface_ips()`.
+    """
+
+    if log:
+        logging.log("resetting interface labels", "info")
+
+    for link in project.links:
+        if link.nodes is None:
+            continue
+
+        for link_node in link.nodes:
+            node = project.get_node(node_id=link_node["node_id"])
+            if node is None or node.name is None or node.ports is None:
+                continue
+
+            interface_name = node.ports[link_node["adapter_number"]]["name"]
+
+            new_label_text = f"{interface_name}"
+            new_label_style = "'font-family: TypeWriter;font-size: 10.0;font-weight: bold;fill: #000000;fill-opacity: 1.0;'"
+
+            link_node["label"]["text"] = new_label_text
+            link_node["label"]["style"] = new_label_style
+
+        link.update(nodes=link.nodes)

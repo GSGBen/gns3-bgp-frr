@@ -1,7 +1,13 @@
 !========== BGP config
+!
 ! define this before using in BGP otherwise it won't send/receive all routes
 ! until after a session clear
 ip prefix-list allow-all seq 5 permit any
+!
+! tag iBGP so we can redistribute only eBGP into OSPF to avoid the wrong border router advertising the route
+route-map TAG_IBGP permit 10
+ set tag 1
+exit
 !
 ! speed up failover
 bfd
@@ -14,7 +20,12 @@ router bgp {{ asn }}
  ! FRR 7.4 and up require this now to advertise routes not in our routing table.
  no bgp network import-check
  !
+ bgp router-id {{ router_id }}
+ bgp default show-hostname
+ bgp default show-nexthop-hostname
+ !
  {%- for neighbor in neighbors %}
+ ! {{ neighbor.name }}
  neighbor {{ neighbor.ip }} remote-as {{ neighbor.asn }}
  neighbor {{ neighbor.ip }} description {{ neighbor.name }}
  ! make routing updates instantaneous
@@ -22,13 +33,14 @@ router bgp {{ asn }}
  ! speed up failover
  neighbor {{ neighbor.ip }} timers 1 3
  neighbor {{ neighbor.ip }} bfd
+ !
  {%- endfor %}
  !
  address-family ipv4 unicast
   {%- if advertised_networks %}
   ! originate specific networks on this device
-  {% endif -%}
-  {%- for network in advertised_networks -%}
+  {%- endif -%}
+  {%- for network in advertised_networks %}
   network {{ network }}
   {%- endfor %}
   !
@@ -38,8 +50,13 @@ router bgp {{ asn }}
   {% endif %}
   ! FRR requires this now to send or receive any routes, as part of RFC 8212
   {%- for neighbor in neighbors %}
+  ! {{ neighbor.name }}
   neighbor {{ neighbor.ip }} prefix-list allow-all in
   neighbor {{ neighbor.ip }} prefix-list allow-all out
+  {%- if neighbor.asn == asn %}
+  neighbor {{ neighbor.ip }} route-map TAG_IBGP in
+  {%- endif %}
+  !
   {%- endfor %}
   !
  exit-address-family
