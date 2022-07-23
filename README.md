@@ -117,12 +117,14 @@ vtysh
 
 * You need to call `node.get_links()` before `node.links`
 * In FRR you have to create the prefix list before specifying it in the BGP config if you want all the routes to work immediately. It'll apply the other way, but you'll be missing some BGP routes and only clearing the session or restarting fixes it.
-* ASN 1 peers iBGP on interface IPs for lab simplicity. If you're feeling fired up you can convert it to loopbacks.
+* ASN 1 peers iBGP on interface IPs for lab simplicity. If you're feeling fired up there's a bunch of TODOs further down that would be good lab extension tasks.
+* border routers advertise connected transit links instead of other simulated networks for lab simplicity
 * You can't change GNS3 node labels (even in the GUI), they always reflect the hostname. This is why `node.update(label=new_label_dict)` isn't working.
 
 ## TODO
 
 * Clean up iBGP / OSPF interaction
 * Generate and peer on loopbacks
+* Advertise other networks from each asn border router, no connected transit links
 * Write a test for internet connectivity from alpine-1
 * Automate and write tests for traffic engineering scenarios: prefer longer paths etc
