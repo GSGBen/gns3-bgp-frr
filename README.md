@@ -124,3 +124,5 @@ vtysh
 
 * Clean up iBGP / OSPF interaction
 * Generate and peer on loopbacks
+* Write a test for internet connectivity from alpine-1
+* Automate and write tests for traffic engineering scenarios: prefer longer paths etc
