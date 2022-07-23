@@ -11,8 +11,12 @@ router ospf
  ! not just the /25 internal ones.
  network 0.0.0.0/0 area 0
  ! avoid the wrong border router advertising itself as the next hop for an eBGP route
- ! - without this they all redistribute all eBGP routes
+ ! - without this they all redistribute all iBGP routes
  redistribute bgp route-map NOT_IBGP
+ {%- if default_information_originate %}
+ ! required as it won't redistribute from bgp without it
+ default-information originate
+ {%- endif %}
 !
 {% for name in ospf_interfaces -%}
 interface {{ name }}

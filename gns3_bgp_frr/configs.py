@@ -93,12 +93,21 @@ def generate_ospf_config(
     @see `generate_configs()`.
     """
     if node_name.startswith("asn1"):
+
+        # required, as it won't redistribute from bgp
+        default_information_originate = (
+            True
+            if node_name.endswith("border1") or node_name.endswith("border2")
+            else False
+        )
+
         node_ospf_interfaces = ospf_interfaces[node_name]
         ospf_config = ospf_template.render(
             {
                 "ospf_interfaces": node_ospf_interfaces,
                 "asn1_supernet": asn1_supernet,
                 "router_id": generate_router_id(node_name),
+                "default_information_originate": default_information_originate,
             }
         )
     else:

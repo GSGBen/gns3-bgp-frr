@@ -40,7 +40,6 @@ Usage: `python manage.py <global options> <command> <command options>`
 * Install dependencies
   * `pip install -r requirements.txt`
 
-
 ## Usage
 
 ### Start nodes
@@ -120,3 +119,8 @@ vtysh
 * In FRR you have to create the prefix list before specifying it in the BGP config if you want all the routes to work immediately. It'll apply the other way, but you'll be missing some BGP routes and only clearing the session or restarting fixes it.
 * ASN 1 peers iBGP on interface IPs for lab simplicity. If you're feeling fired up you can convert it to loopbacks.
 * You can't change GNS3 node labels (even in the GUI), they always reflect the hostname. This is why `node.update(label=new_label_dict)` isn't working.
+
+## TODO
+
+* Clean up iBGP / OSPF interaction
+* Generate and peer on loopbacks
