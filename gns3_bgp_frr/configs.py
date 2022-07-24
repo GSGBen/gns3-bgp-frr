@@ -141,8 +141,9 @@ def generate_bgp_config(
             # non-ASN-1 devices just advertise their connected links instead
             redistribute_connected = True
 
+        # configure external BGP or a default route for asn1border1 and asn1border2
+        external_default_gateway = None
         if node.name == "asn1border1" or node.name == "asn1border2":
-            # configure external BGP or a default route for asn1border1 and asn1border2
             if settings.ENABLE_EXTERNAL_GATEWAY_BGP:
                 neighbors.append(
                     gns3.NeighboringBorderRouterInfo(
@@ -157,6 +158,8 @@ def generate_bgp_config(
                     f"{external_ip_subnet.network}/{external_ip_subnet.prefixlen}"
                 )
                 advertised_networks.append(IPNetwork(external_subnet))
+            else:
+                external_default_gateway = settings.EXTERNAL_GATEWAY
 
         bgp_config = bgp_template.render(
             {
@@ -165,6 +168,7 @@ def generate_bgp_config(
                 "advertised_networks": advertised_networks,
                 "redistribute_connected": redistribute_connected,
                 "router_id": generate_router_id(node.name),
+                "external_default_gateway": external_default_gateway,
             }
         )
     else:

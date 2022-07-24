@@ -1,7 +1,6 @@
 # gns3-bgp-frr
 
-A lightweight GNS3 BGP lab using Free Range Routing docker containers and Python automation, with external connectivity.
-Addresses are automatically assigned to links, configs are generated and applied. WIP.
+A lightweight GNS3 BGP lab using Free Range Routing docker containers and Python automation, with external connectivity. Addresses are automatically assigned to links, configs are generated and applied.
 
 Control the entire simulation from the commandline, break it manually and reset it, or extend it with your own commands.
 
@@ -25,7 +24,7 @@ Usage: `python manage.py <global options> <command> <command options>`
   * image: `frrouting/frr:v8.2.2`
   * adapters: `8`
   * advanced > additional persistent directories: `/etc/frr`
-    * if you can't find this during the creation), create the template then right click > edit it
+    * if you can't find this during template creation, create the template then right click > edit it
 * Add another
   * name: `alpine`
   * image: `alpine`
@@ -82,16 +81,70 @@ Usage: `python manage.py <global options> <command> <command options>`
 
 **Note**: router IDs in OSPF and BGP are `0.type.asn.num`, for easier understanding. GNS3 doesn't allow changing the router labels from their hostname though. `type` is 0 for border routers, 1 for internal, 2 for CPE. `asn` is asn and `num` is the last number in the hostname. So e.g. `asn1border3` has a router ID of `0.0.1.3`.
 
+At this point `alpine-1` should be able to ping `asn1border1`.
+
 ## External Connectivity
 
-Note: this uses public AS numbers (1-6) for simplicity. Don't use the BGP method with a device that's peering with other real public ASes.
+### BGP
+
+**Note**: this uses public AS numbers (1-6) for simplicity. Don't use the BGP method with a device that's peering with other real public ASes.
+
+If your external gateway can run BGP, you can configure it to peer with `asn1border1` and `2` on the IPs you set in `settings.py`. Advertise a default route and configure firewalling/NAT to allow internet connectivity. Remember you might have to apply distribution lists if your device conforms to RFC 8212.
+
+FortiGate BGP example (required firewall and NAT rules omitted):
+
+<details>
+  <summary>Click to expand</summary>
+
+```fortigate
+config router access-list
+    edit "distribute-all"
+        config rule
+            edit 1
+                set prefix any
+            next
+        end
+    next
+end
+config router bgp
+    set as <EXTERNAL_GATEWAY_ASN from settings.py>
+    set router-id <id>
+    config neighbor
+        edit "<ASN1BORDER1_EXTERNAL_IP from settings.py>"
+            set distribute-list-in "distribute-all"
+            set distribute-list-out "distribute-all"
+            set remote-as 1
+        next
+        edit "<ASN1BORDER2_EXTERNAL_IP from settings.py>"
+            set distribute-list-in "distribute-all"
+            set distribute-list-out "distribute-all"
+            set remote-as 1
+        next
+    end
+    config redistribute "connected"
+        set status enable
+    end
+    config redistribute "static"
+        set status enable
+    end
+end
+```
+
+</details>
+
+### Static route
+
+If you don't have external BGP you might be able to get basic external connectivity with static routes. Create static routes on your `EXTERNAL_GATEWAY` device that route `P2P_SUPERNET` to `ASN1BORDER1_EXTERNAL_IP` and `ASN1BORDER2_EXTERNAL_IP`. Note that a lot of basic home modem/routers will only NAT their immediate local LAN subnet so you might not get internet connectivity from `alpine-1` with this option.
 
 ## Testing
 
-TODO: expand.
+Pytest is used.
 
-* `python manage.py test`
-* `pytest --no-header --tb=line -rA`
+Run tests with `python manage.py test` assuming gns3 is configured correctly.
+
+If not, run tests with `pytest --no-header --tb=line -rA` which will allow testing gns3 without trying to load dependencies first.
+
+Add additional tests to the `tests` folder.
 
 ## Troubleshooting
 
@@ -100,7 +153,7 @@ TODO: expand.
 ## Misc notes
 
 * Thought I was losing my mind before I found this: FRR 7.4+ requirements have changed for BGP.
-  * You have to define an out filter to send routes and an in filter to receive them (I knew this one)
+  * You have to define an out filter to send routes and an in filter to receive them (I knew this one),
   * But ALSO now set [`no bgp network import-check`](https://docs.frrouting.org/en/latest/bgp.html#clicmd-bgp-network-import-check) to allow advertising routes that aren't in the local routing table (I assumed it was still the original behaviour). What threw me is that `show ip bgp all` on the local router still listed the routes.
 * Debugging FRR:
 
@@ -118,13 +171,16 @@ vtysh
 * You need to call `node.get_links()` before `node.links`
 * In FRR you have to create the prefix list before specifying it in the BGP config if you want all the routes to work immediately. It'll apply the other way, but you'll be missing some BGP routes and only clearing the session or restarting fixes it.
 * ASN 1 peers iBGP on interface IPs for lab simplicity. If you're feeling fired up there's a bunch of TODOs further down that would be good lab extension tasks.
-* border routers advertise connected transit links instead of other simulated networks for lab simplicity
-* You can't change GNS3 node labels (even in the GUI), they always reflect the hostname. This is why `node.update(label=new_label_dict)` isn't working.
+* border routers advertise connected transit links instead of other simulated networks for lab simplicity.
+* You can't change GNS3 node labels (even in the GUI), they always reflect the hostname. This is why `node.update(label=new_label_dict)` doesn't work.
 
 ## TODO
+
+These would also be good lab extension tasks.
 
 * Clean up iBGP / OSPF interaction
 * Generate and peer on loopbacks
 * Advertise other networks from each asn border router, no connected transit links
 * Write a test for internet connectivity from alpine-1
-* Automate and write tests for traffic engineering scenarios: prefer longer paths etc
+* Automate and write tests for traffic engineering scenarios: prefer longer paths etc.
+  * Could have a `scenario` command with subcommands for each scenario. Same with tests.

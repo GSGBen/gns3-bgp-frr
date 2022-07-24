@@ -9,6 +9,10 @@ route-map TAG_IBGP permit 10
  set tag 1
 exit
 !
+{%- if external_default_gateway %}
+ip route 0.0.0.0/0 {{ external_default_gateway }}
+!
+{%- endif %}
 ! speed up failover
 bfd
  {%- for neighbor in neighbors %}
@@ -37,6 +41,10 @@ router bgp {{ asn }}
  {%- endfor %}
  !
  address-family ipv4 unicast
+  {%- if external_default_gateway %}
+  redistribute static
+  !
+  {%- endif %}
   {%- if advertised_networks %}
   ! originate specific networks on this device
   {%- endif -%}
