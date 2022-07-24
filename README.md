@@ -85,6 +85,8 @@ At this point `alpine-1` should be able to ping `asn1border1`.
 
 ## External Connectivity
 
+![external ping](images/external_ping.png)
+
 ### BGP
 
 **Note**: this uses public AS numbers (1-6) for simplicity. Don't use the BGP method with a device that's peering with other real public ASes.
