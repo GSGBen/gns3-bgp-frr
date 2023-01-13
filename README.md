@@ -192,7 +192,7 @@ These would also be good lab extension tasks.
 Hey, do you like videogames? If so please check out my game **Grab n' Throw** on Steam, and add it to your wishlist. One gamemode is like golf but on a 256 km^2 landscape, with huge throw power, powerups, and a moving hole. And there's plenty more!
 
 <p align="center">
-  <a href=https://store.steampowered.com/app/1813590/Grab_n_Throw/?utm_source=github_t2md>
+  <a href="https://store.steampowered.com/app/1813590/Grab_n_Throw/?utm_source=github_gns3_bgp_frr">
     <img src="images/throwing-3.gif">
   </a>
 </p>
